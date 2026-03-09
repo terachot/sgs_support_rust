@@ -1,0 +1,25 @@
+[bundle]
+identifier = "spns.ac.th"
+publisher = "Satree Pak Phanang"
+
+[application]
+
+[web.app]
+
+# HTML title tag content
+title = "sgs_support"
+
+# include `assets` in web platform
+[web.resource]
+
+# Additional CSS style files
+style = []
+
+# Additional JavaScript files
+script = []
+
+[web.resource.dev]
+
+# Javascript code file
+# serve: [dev-server] only
+script = []

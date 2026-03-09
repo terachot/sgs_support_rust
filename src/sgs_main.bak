@@ -1,0 +1,140 @@
+use dioxus::{prelude::*};
+
+//to run test: "dx serve"
+//to build: "dx bundle --desktop"
+const FAVICON: Asset = asset!("/assets/favicon.ico");
+const MAIN_CSS: Asset = asset!("/assets/main.css");
+const TAILWIND_CSS: Asset = asset!("assets/tailwind.css");
+
+#[derive(Clone, Debug, PartialEq, Routable)]
+enum Route {
+    #[route("/")]
+    Home,
+
+    #[route("/about")]
+    About,
+
+    #[route("/user")]
+    User,
+}
+
+fn main() {
+    dioxus::launch(|| rsx! {
+        Router::<Route> {}
+    });
+}
+
+#[component]
+fn Home() -> Element {
+    rsx! {
+        document::Meta {
+            name: "viewport",
+            content: "width=device-width, initial-scale=1.0",
+        }
+        document::Link { rel: "icon", href: FAVICON }
+        document::Link { rel: "stylesheet", href: MAIN_CSS }
+        document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+        div { class: "flex flex-col h-screen justify-between min-w-lg min-h-60",
+            Header {}
+            Content {}
+            Footer {}
+        }
+    }
+}
+
+#[component]
+fn About() -> Element {
+    rsx! {
+        document::Meta {
+            name: "viewport",
+            content: "width=device-width, initial-scale=1.0",
+        }
+        document::Link { rel: "icon", href: FAVICON }
+        document::Link { rel: "stylesheet", href: MAIN_CSS }
+        document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+        div { class: "flex flex-col h-screen justify-between min-w-lg min-h-60",
+            Header {}
+            div {
+                "About"
+                Link { to: Route::Home, "Go to Home Page" }
+                Link { to: Route::User, "Go to User Page" }
+            }
+            Footer {}
+        }
+    }
+}
+
+#[component]
+fn User() -> Element {
+    rsx! {
+        document::Meta {
+            name: "viewport",
+            content: "width=device-width, initial-scale=1.0",
+        }
+        document::Link { rel: "icon", href: FAVICON }
+        document::Link { rel: "stylesheet", href: MAIN_CSS }
+        document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+        div { class: "flex flex-col h-screen justify-between min-w-lg min-h-60",
+            Header {}
+            div {
+                "User"
+                Link { to: Route::Home, "Go to Home Page" }
+                Link { to: Route::About, "Go to About Page" }
+            }
+            Footer {}
+        }
+    }
+}
+
+#[component]
+pub fn Header() -> Element {
+    rsx! {
+        div { class: "p-2 flex flex-row justify-between",
+            h1 { class: "text-xl font-bold", "SGS Support" }
+            h1 { class: "text-xl font-bold", "ปุ่มปรับ Theme" }
+        }
+    }
+}
+
+#[component]
+pub fn Content() -> Element {
+    rsx! {
+        div { class: "p-2 grow flex flex-col justify-center items-center min-h-0 overflow-y-auto",
+            h2 { class: "text-lg font-bold w-md text-center", "ลงชื่อ" }
+            input {
+                class: "m-2 p-2 w-3/5 min-w-xs max-w-lg border-1 rounded-lg",
+                placeholder: "ชื่อผู้ใช้",
+            }
+            input {
+                class: "m-2 p-2 w-3/5 min-w-xs max-w-lg border-1 rounded-lg",
+                placeholder: "รหัสผ่าน",
+                r#type: "password",
+            }
+            button {
+                class: "px-6 py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-md transition transform duration-150 hover:bg-blue-600 active:scale-95",
+                onclick: move |_| {
+                    do_something();
+                },
+                "เข้าใช้งาน"
+            }
+        }
+    }
+}
+
+#[component]
+pub fn Footer() -> Element {
+    rsx! {
+        div { class: "p-2",
+            h3 { class: "text-base font-bold", "การทำงาน" }
+            h4 { class: "overflow-y-auto leading-6 line-clamp-4 h-[6*4px] text-sm",
+                "รอการเข้าสู่ระบบ"
+            }
+        }
+    }
+}
+
+fn do_something() {
+   let nav = navigator();
+   nav.push(Route::Home {});
+   println!("ทำงานเรียบร้อยแล้ว");
+}

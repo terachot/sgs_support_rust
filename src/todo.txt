@@ -1,0 +1,20 @@
+Stucture :
+   - main.rs /
+   - home.rs /
+   - work.rs /
+   - compos.rs /
+UI :
+   - home.rs /
+   - work.rs 
+Process :
+   - theme
+   - login
+      - open web
+      - login
+   - load excel
+   - fill data
+      - score page      0.4
+      - attribute page  0.6
+      - study page      0.8
+   - auto fill          1.0
+Bug fix :
