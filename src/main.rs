@@ -51,7 +51,7 @@ fn main() {
             Config::new().with_window(
                 WindowBuilder::default()
                     .with_title("SGS Support")
-                    .with_inner_size(LogicalSize::new(600, 400)),
+                    .with_inner_size(LogicalSize::new(600, 460)),
             )
         }))
         .launch(|| rsx! {
