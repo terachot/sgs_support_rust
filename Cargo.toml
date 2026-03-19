@@ -1,6 +1,6 @@
 [package]
 name = "sgs_support"
-version = "0.1.0"
+version = "0.3.0"
 authors = ["Teerapat Terachot <t.terachot@gmail.com>"]
 edition = "2021"
 
@@ -9,6 +9,13 @@ edition = "2021"
 [dependencies]
 dioxus = { version = "0.7.3", features = ["router"] }
 dioxus-router = "0.7.3"
+chromiumoxide = { version = "0.9.1", features = [
+    "fetcher",      # auto-download Chromium ถ้าไม่มี browser ในเครื่อง
+    "rustls",       # TLS สำหรับดาวน์โหลด
+    "zip0",         # แตกไฟล์ที่ดาวน์โหลด
+] }
+tokio   = { version = "1.50", features = ["full"] }
+futures = "0.3"
 
 [features]
 default = ["desktop"]

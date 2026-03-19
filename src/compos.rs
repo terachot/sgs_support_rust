@@ -67,16 +67,28 @@ pub fn NavButtons(props: NavButtonsProps) -> Element {
 
 #[component]
 pub fn student_data() -> Element {
-    rsx! {
+   let mut std_num = use_signal(|| "40".to_string());  // สร้าง signal
+
+   rsx! {
       div { class: "p-2 grow flex flex-col justify-center items-center min-h-0 overflow-y-auto",
-         h4 { "การแสดงข้อมูลต่อหน้า" }
-         input {
-            class: "text-center p-1 m-2",
-            r#type: "text",
-            placeholder: "กรุณาใส่ตัวเลข",
-            value: "40",
-            onchange: move |_| println!("ตั้งค่าข้อมูลต่อหน้า"),
+         div { class: "flex flex-row justify-center items-center",
+            h4 { "การแสดงข้อมูลต่อหน้า" }
+            input {
+               class: "text-center p-1 m-2 bg-green-800",
+               r#type: "text",
+               placeholder: "กรุณาใส่ตัวเลข",
+               value: "{std_num}",
+               id: "std_num",
+               onchange: move |e| {
+                   *std_num.write() = e.value(); // อัพเดทค่าเมื่อเปลี่ยน
+                   println!(
+                       "ตั้งค่าข้อมูลต่อหน้า {}",
+                       std_num(),
+                   )
+               },
+            }
          }
+
          h3 { "อัพโหลดข้อมูลนักเรียน" }
          button {
             class: "m-3 px-6 py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-md transition transform duration-150 hover:bg-blue-600 active:scale-95",
@@ -89,13 +101,32 @@ pub fn student_data() -> Element {
 
 #[component]
 pub fn score_before() -> Element {
-    rsx! {
+   let mut subject = use_signal(|| "โปรดเลือก".to_string());
+
+   rsx! {
       div { class: "p-2 grow flex flex-col justify-center items-center min-h-0 overflow-y-auto",
          h3 { "ลงคะแนนก่อนกลางภาค" }
-         button {
-            class: "m-3 px-6 py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-md transition transform duration-150 hover:bg-blue-600 active:scale-95",
-            onclick: move |_| println!("ลงคะแนนก่อนกลางภาค"),
-            "ลงคะแนนก่อนกลางภาค"
+         div { class: "flex flex-col justify-center items-center",
+            form {
+               onchange: move |e| {
+                   e.prevent_default();
+                   *subject.write() = e.value();
+                   println!("รายวิชา {}", e.value())
+               },
+               label { "เลือกรายวิชา : " }
+               select { id: "subject",
+                  option { value: "ว22104", "ว22104" }
+                  option { value: "ว22203", "ว22203" }
+               }
+            }
+
+            h4 { "เลือกระดับชั้นที่จะลงคะแนน" }
+
+            button {
+               class: "m-3 px-6 py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-md transition transform duration-150 hover:bg-blue-600 active:scale-95",
+               onclick: move |_| println!("ลงคะแนนก่อนกลางภาค"),
+               "ลงคะแนนก่อนกลางภาค"
+            }
          }
       }
    }
