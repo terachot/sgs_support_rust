@@ -1,28 +1,48 @@
-# Development
+# SGS Support
 
-Your new bare-bones project includes minimal organization with a single `main.rs` file and a few assets.
+แอปเดสก์ท็อป Rust + Dioxus 0.7 สำหรับช่วยนำคะแนนจาก Excel ไปกรอกในระบบ SGS โดยจับคู่ข้อมูลด้วย `stdID` ก่อนกรอกทุกครั้ง
 
-```
-project/
-├─ assets/ # Any assets that are used by the app should be placed here
-├─ src/
-│  ├─ main.rs # main.rs is the entry point to your application and currently contains all components for the app
-├─ Cargo.toml # The Cargo.toml file defines the dependencies and feature flags for your project
-```
+## ความสามารถ
 
+- เปิด Chrome หรือ Edge และเข้าสู่ระบบ SGS จริง
+- สลับไปใช้ mockup ที่ `http://localhost/sgs_tester/` สำหรับทดสอบ
+- อ่าน `.xlsx`/`.xlsm` หลายชีต โดยถือว่าแต่ละชีตเป็นหนึ่งห้องเรียน
+- รองรับคะแนนก่อนกลางภาค `S1`–`S9`, `Midterm`
+- รองรับคะแนนหลังกลางภาค `S10`–`S18`, `Final`
+- รองรับคุณลักษณะ `Q1`–`Q8` และการอ่านคิดวิเคราะห์ `L1`–`L5`
+- ไม่กดบันทึกเมื่อไม่พบรหัสนักเรียนตรงกัน ไม่มีคะแนนสำหรับหน้านั้น หรือกรอกบางช่องล้มเหลว
 
+## รูปแบบ Excel
 
-### Serving Your App
+สองคอลัมน์แรกต้องเป็น:
 
-Run the following command in the root of your project to start developing with the default platform:
-
-```bash
-dx serve
-```
-
-To run for a different platform, use the `--platform platform` flag. E.g.
-```bash
-dx serve --platform desktop
+```text
+stdID | student Name | S1 | ... | Midterm | S10 | ... | Final | Q1 | ... | Q8 | L1 | ... | L5
 ```
 
+คอลัมน์คะแนนที่ไม่มีในไฟล์หรือเซลล์ว่างจะถูกข้าม จึงใช้ไฟล์แบบย่อที่มีเฉพาะคะแนนที่ต้องการกรอกได้
 
+## วิธีใช้งาน
+
+1. รันแอปและเลือก `SGS จริง` หรือ `Mockup localhost`
+2. กรอกชื่อผู้ใช้/รหัสผ่าน แล้วกดเปิดเบราว์เซอร์
+3. เลือกไฟล์ Excel
+4. เลือกประเภทคะแนน แล้วกด `เปิดหน้า SGS`
+5. ในหน้าต่างเบราว์เซอร์ เลือกปีการศึกษา ชั้น ห้อง และรายวิชาให้ถูกต้อง
+6. กลับมาที่แอป แล้วกด `กรอกและบันทึกหน้านี้`
+
+โปรแกรมไม่บันทึกรหัสผ่านลงไฟล์ และจะรวมรายชื่อนักเรียนจากทุกชีตเพื่อจับคู่เฉพาะรายชื่อที่แสดงในหน้า SGS ปัจจุบัน
+
+## พัฒนาและทดสอบ
+
+```powershell
+cargo run
+cargo test --all-features
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+สร้างไฟล์ release:
+
+```powershell
+cargo build --release
+```

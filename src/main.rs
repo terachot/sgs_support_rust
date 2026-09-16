@@ -1,19 +1,19 @@
 // ─────────────────────────────────────────────
-//  main.rs  —  Entry point for the Dioxus app
-//  Compatible with: Dioxus 0.7.x
+//  main.rs  —  Entry point for the SGS Support app
+//  Dioxus 0.7.x (desktop)
 // ─────────────────────────────────────────────
 
+mod browser;
+mod compos;
+mod excel;
 mod home;
 mod work;
-mod compos;
 
 use dioxus::prelude::*;
 
-use home::Home;
-use work::Work;
-
-//to run test: "dx serve"
-//to build: "dx bundle --desktop"
+use crate::compos::AppState;
+use crate::home::Home;
+use crate::work::Work;
 
 #[derive(Routable, Clone, PartialEq)]
 pub enum Route {
@@ -23,7 +23,6 @@ pub enum Route {
     #[route("/work")]
     Work,
 
-    // Catch-all 404
     #[route("/:..segments")]
     NotFound { segments: Vec<String> },
 }
@@ -51,10 +50,11 @@ fn main() {
             Config::new().with_window(
                 WindowBuilder::default()
                     .with_title("SGS Support")
-                    .with_inner_size(LogicalSize::new(600, 460)),
+                    .with_inner_size(LogicalSize::new(960, 720)),
             )
         }))
-        .launch(|| rsx! {
-            Router::<Route> {}
+        .launch(|| {
+            use_context_provider(AppState::new);
+            rsx! { Router::<Route> {} }
         });
 }

@@ -1,6 +1,6 @@
 [package]
 name = "sgs_support"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Teerapat Terachot <t.terachot@gmail.com>"]
 edition = "2021"
 
@@ -16,6 +16,18 @@ chromiumoxide = { version = "0.9.1", features = [
 ] }
 tokio   = { version = "1.50", features = ["full"] }
 futures = "0.3"
+
+# อ่านไฟล์ Excel (.xlsx)
+calamine = "0.26"
+
+# ไฟล์ dialog (เลือกไฟล์)
+rfd = "0.15"
+
+# error handling + serde
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
 
 [features]
 default = ["desktop"]

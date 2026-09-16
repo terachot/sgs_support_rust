@@ -1,57 +1,202 @@
-// home.rs — Compatible with Dioxus 0.7.x
+//! หน้าเปิดเบราว์เซอร์และเข้าสู่ระบบ SGS
+
 use dioxus::prelude::*;
+use dioxus_router::Navigator;
 
-use crate::Route;
-use crate::compos::*;
+use crate::browser::{Session, Target};
+use crate::compos::{push_log, AppState, Header, LogPanel};
 
-const FAVICON: Asset = asset!("/assets/favicon.ico");
-const MAIN_CSS: Asset = asset!("/assets/main.css");
-const TAILWIND_CSS: Asset = asset!("assets/tailwind.css");
-
-/// Home page component
 #[component]
 pub fn Home() -> Element {
-    rsx! {
-      document::Meta {
-         name: "viewport",
-         content: "width=device-width, initial-scale=1.0",
-      }
-      document::Link { rel: "icon", href: FAVICON }
-      document::Link { rel: "stylesheet", href: MAIN_CSS }
-      document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+    let app_state = use_context::<AppState>();
+    let mut username = use_signal(String::new);
+    let mut password = use_signal(String::new);
+    let mut target = use_signal(|| Target::Production);
+    let is_busy = use_signal(|| false);
+    let status = use_signal(|| "เลือกปลายทางและกรอกข้อมูลเข้าสู่ระบบ".to_owned());
+    let log = use_signal(|| vec!["พร้อมเริ่มการทำงาน".to_owned()]);
+    let navigator = use_navigator();
 
-      div { class: "flex flex-col h-screen justify-between min-w-lg min-h-60",
-         Header {}
-         Content {}
-         Footer {}
-      }
-   }
+    rsx! {
+        Header {}
+        main { class: "login-layout",
+            section { class: "intro-panel",
+                p { class: "eyebrow", "RUST + DIOXUS 0.7" }
+                h2 { "กรอกผลการเรียนได้เร็วขึ้น โดยยังตรวจสอบทุกขั้นตอน" }
+                p {
+                    "โปรแกรมจะเปิด Chrome หรือ Edge แยกต่างหาก อ่านข้อมูลจาก Excel และจับคู่ด้วยรหัสนักเรียนก่อนกรอก"
+                }
+                ol { class: "feature-list",
+                    li { "เข้าสู่ระบบ SGS ในหน้าต่างเบราว์เซอร์" }
+                    li { "เลือกไฟล์ Excel ที่มี stdID และ student Name" }
+                    li { "เลือกหน้า ห้อง และรายวิชา แล้วสั่งกรอก" }
+                }
+            }
+
+            section { class: "login-card",
+                div { class: "panel-heading",
+                    div {
+                        p { class: "eyebrow", "เริ่มต้น" }
+                        h2 { "เข้าสู่ระบบ" }
+                    }
+                    span { class: "status-dot" }
+                }
+
+                div { class: "target-switch",
+                    button {
+                        class: if target() == Target::Production { "target active" } else { "target" },
+                        disabled: is_busy(),
+                        onclick: move |_| target.set(Target::Production),
+                        "SGS จริง"
+                    }
+                    button {
+                        class: if target() == Target::Mock { "target active" } else { "target" },
+                        disabled: is_busy(),
+                        onclick: move |_| target.set(Target::Mock),
+                        "Mockup localhost"
+                    }
+                }
+                p { class: "target-url", "{target().login_url()}" }
+
+                label { class: "field",
+                    span { "ชื่อผู้ใช้" }
+                    input {
+                        r#type: "text",
+                        autocomplete: "username",
+                        value: "{username}",
+                        disabled: is_busy(),
+                        oninput: move |event| username.set(event.value()),
+                    }
+                }
+                label { class: "field",
+                    span { "รหัสผ่าน" }
+                    input {
+                        r#type: "password",
+                        autocomplete: "current-password",
+                        value: "{password}",
+                        disabled: is_busy(),
+                        oninput: move |event| password.set(event.value()),
+                        onkeydown: {
+                            let app_state = app_state.clone();
+                            move |event| {
+                                if event.key() == Key::Enter && !is_busy() {
+                                    start_login(LoginTask {
+                                        username: username.read().clone(),
+                                        password: password.read().clone(),
+                                        password_field: password,
+                                        target: target(),
+                                        app_state: app_state.clone(),
+                                        log,
+                                        status,
+                                        is_busy,
+                                        navigator,
+                                    });
+                                }
+                            }
+                        },
+                    }
+                }
+
+                button {
+                    class: "button button-primary button-wide",
+                    disabled: is_busy(),
+                    onclick: {
+                        let app_state = app_state.clone();
+                        move |_| start_login(LoginTask {
+                            username: username.read().clone(),
+                            password: password.read().clone(),
+                            password_field: password,
+                            target: target(),
+                            app_state: app_state.clone(),
+                            log,
+                            status,
+                            is_busy,
+                            navigator,
+                        })
+                    },
+                    if is_busy() { "กำลังเชื่อมต่อ..." } else { "เปิดเบราว์เซอร์และเข้าสู่ระบบ" }
+                }
+                p { class: "login-status", "{status}" }
+            }
+        }
+        LogPanel { log }
+    }
 }
 
-#[component]
-fn Content() -> Element {
-   // use_navigator() ให้ navigator object สำหรับเปลี่ยนหน้าแบบ programmatic
-   let nav = use_navigator();
+struct LoginTask {
+    username: String,
+    password: String,
+    password_field: Signal<String>,
+    target: Target,
+    app_state: AppState,
+    log: Signal<Vec<String>>,
+    status: Signal<String>,
+    is_busy: Signal<bool>,
+    navigator: Navigator,
+}
 
-   rsx! {
-      div { class: "p-2 grow flex flex-col justify-center items-center min-h-0 overflow-y-auto",
-         h2 { class: "text-lg font-bold w-md text-center", "ลงชื่อ" }
-         input {
-            class: "m-2 p-2 w-3/5 min-w-xs max-w-lg border-1 rounded-lg",
-            placeholder: "ชื่อผู้ใช้",
-         }
-         input {
-            class: "m-2 p-2 w-3/5 min-w-xs max-w-lg border-1 rounded-lg",
-            placeholder: "รหัสผ่าน",
-            r#type: "password",
-         }
-         button {
-            class: "px-6 py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-md transition transform duration-150 hover:bg-blue-600 active:scale-95",
-            onclick: move |_| {
-                nav.push(Route::Work);
-            },
-            "เข้าใช้งาน"
-         }
-      }
-   }
+fn start_login(task: LoginTask) {
+    let LoginTask {
+        username,
+        password,
+        mut password_field,
+        target,
+        app_state,
+        mut log,
+        mut status,
+        mut is_busy,
+        navigator,
+    } = task;
+    if target == Target::Production && (username.trim().is_empty() || password.is_empty()) {
+        status.set("กรุณากรอกชื่อผู้ใช้และรหัสผ่าน".to_owned());
+        return;
+    }
+
+    spawn(async move {
+        is_busy.set(true);
+        status.set(format!("กำลังเปิด {}...", target.label()));
+        push_log(&mut log, format!("เชื่อมต่อไปยัง {}", target.login_url()));
+
+        let mut session_guard = app_state.session.lock().await;
+        if let Some(old_session) = session_guard.take() {
+            if let Err(error) = old_session.close().await {
+                push_log(&mut log, format!("ปิดเบราว์เซอร์เดิมไม่สมบูรณ์: {error}"));
+            }
+        }
+
+        let (session, source_message) = match Session::launch(target).await {
+            Ok(result) => result,
+            Err(error) => {
+                status.set(format!("เปิดเบราว์เซอร์ไม่สำเร็จ: {error}"));
+                push_log(&mut log, status.read().clone());
+                is_busy.set(false);
+                return;
+            }
+        };
+        push_log(&mut log, source_message);
+
+        if let Err(error) = session.open_login().await {
+            status.set(format!("เปิดหน้าเข้าสู่ระบบไม่สำเร็จ: {error}"));
+            push_log(&mut log, status.read().clone());
+            let _ = session.close().await;
+            is_busy.set(false);
+            return;
+        }
+        status.set("กำลังเข้าสู่ระบบ...".to_owned());
+        if let Err(error) = session.login(&username, &password).await {
+            status.set(format!("เข้าสู่ระบบไม่สำเร็จ: {error}"));
+            push_log(&mut log, status.read().clone());
+            let _ = session.close().await;
+            is_busy.set(false);
+            return;
+        }
+
+        *session_guard = Some(session);
+        drop(session_guard);
+        password_field.write().clear();
+        status.set(format!("เข้าสู่ระบบ {} สำเร็จ", target.label()));
+        push_log(&mut log, status.read().clone());
+        is_busy.set(false);
+        navigator.push(crate::Route::Work);
+    });
 }
