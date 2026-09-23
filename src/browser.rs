@@ -179,11 +179,49 @@ impl Session {
             return Err(anyhow!(status));
         }
 
+        let mut home_retries = 0;
         for _ in 0..30 {
             tokio::time::sleep(Duration::from_millis(400)).await;
             let current = self.current_url().await.unwrap_or_default();
             if same_page(&current, self.target.home_url()) {
-                return Ok(());
+                if self.target == Target::Mock {
+                    return Ok(());
+                }
+
+                // SGS อาจ redirect มาหน้าแรกแล้วแสดง ASP.NET Server Error ชั่วคราว
+                // จึงต้องเห็นสถานะออกจากระบบก่อนจึงถือว่าเข้าสู่ระบบสำเร็จ
+                let page_state: String = match self
+                    .page
+                    .evaluate(
+                        r#"(function(){
+                        if (document.querySelector('h1')?.textContent?.includes('Server Error in'))
+                            return 'server_error';
+                        const signIn = document.getElementById('ctl00__PageHeader__SignIn');
+                        return /ออกจากระบบ|Sign Out|Log Out/i.test(signIn?.textContent || '')
+                            ? 'authenticated' : 'pending';
+                    })()"#,
+                    )
+                    .await
+                {
+                    Ok(result) => match result.into_value() {
+                        Ok(state) => state,
+                        Err(_) => continue,
+                    },
+                    Err(_) => continue, // หน้าอาจกำลังเปลี่ยนระหว่างตรวจ
+                };
+
+                if page_state == "authenticated" {
+                    return Ok(());
+                }
+                if page_state == "server_error" {
+                    if home_retries >= 2 {
+                        return Err(anyhow!(
+                            "หน้าแรกของ SGS ยังแสดงข้อผิดพลาดของเซิร์ฟเวอร์หลังลองโหลดใหม่"
+                        ));
+                    }
+                    home_retries += 1;
+                    self.navigate_to(self.target.home_url()).await?;
+                }
             }
         }
         Err(anyhow!(

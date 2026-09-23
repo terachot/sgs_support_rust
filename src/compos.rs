@@ -39,14 +39,15 @@ pub struct ExcelSummary {
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
-const MAIN_CSS: Asset = asset!("/assets/main.css");
+// `cargo run` ไม่ผ่านขั้นตอน bundle ของ `dx`; ฝัง CSS เพื่อให้เดสก์ท็อปมีสไตล์เสมอ
+const MAIN_CSS: &str = include_str!("../assets/main.css");
 
 #[component]
 pub fn Header() -> Element {
     rsx! {
         document::Meta { name: "viewport", content: "width=device-width, initial-scale=1.0" }
         document::Link { rel: "icon", href: FAVICON }
-        document::Stylesheet { href: MAIN_CSS }
+        document::Style { "{MAIN_CSS}" }
         header { class: "app-header",
             div {
                 h1 { "SGS Support" }

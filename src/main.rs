@@ -1,3 +1,9 @@
+// Release บน Windows เป็นแอป GUI จึงไม่เปิดหน้าต่างคอนโซลคู่กับแอป
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
+
 // ─────────────────────────────────────────────
 //  main.rs  —  Entry point for the SGS Support app
 //  Dioxus 0.7.x (desktop)
@@ -47,11 +53,13 @@ fn main() {
     dioxus::LaunchBuilder::new()
         .with_cfg(desktop!({
             use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
-            Config::new().with_window(
-                WindowBuilder::default()
-                    .with_title("SGS Support")
-                    .with_inner_size(LogicalSize::new(960, 720)),
-            )
+            Config::new()
+                .with_window(
+                    WindowBuilder::default()
+                        .with_title("SGS Support")
+                        .with_inner_size(LogicalSize::new(680, 560)),
+                )
+                .with_menu(None::<dioxus::desktop::muda::Menu>)
         }))
         .launch(|| {
             use_context_provider(AppState::new);
