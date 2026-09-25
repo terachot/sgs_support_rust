@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use dioxus::prelude::*;
 use tokio::sync::Mutex;
 
@@ -41,9 +41,13 @@ pub struct ExcelSummary {
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 // `cargo run` ไม่ผ่านขั้นตอน bundle ของ `dx`; ฝัง CSS เพื่อให้เดสก์ท็อปมีสไตล์เสมอ
 const MAIN_CSS: &str = include_str!("../assets/main.css");
+const SAMPLE_EXCEL: &[u8] = include_bytes!("../assets/sgs-all.xlsx");
+const SAMPLE_FILE_NAME: &str = "sgs-all.xlsx";
 
 #[component]
 pub fn Header() -> Element {
+    let mut download_status = use_signal(String::new);
+    let mut is_downloading = use_signal(|| false);
     rsx! {
         document::Meta { name: "viewport", content: "width=device-width, initial-scale=1.0" }
         document::Link { rel: "icon", href: FAVICON }
@@ -54,11 +58,69 @@ pub fn Header() -> Element {
                 p { "เครื่องมือช่วยกรอกผลการเรียน" }
             }
             nav {
-                Link { to: crate::Route::Home, "เข้าสู่ระบบ" }
+                button {
+                    class: "sample-download",
+                    disabled: is_downloading(),
+                    title: "บันทึกไฟล์ Excel ตัวอย่างที่ฝังอยู่ในโปรแกรม",
+                    onclick: move |_| {
+                        is_downloading.set(true);
+                        spawn(async move {
+                            match save_sample_excel().await {
+                                Ok(Some(_)) => download_status.set("บันทึกไฟล์แล้ว".to_owned()),
+                                Ok(None) => download_status.set("ยกเลิกการบันทึก".to_owned()),
+                                Err(error) => download_status.set(format!("บันทึกไม่สำเร็จ: {error}")),
+                            }
+                            is_downloading.set(false);
+                        });
+                    },
+                    if is_downloading() { "กำลังบันทึก..." } else { "โหลดไฟล์ตัวอย่าง" }
+                }
                 Link { to: crate::Route::Work, "กรอกข้อมูล" }
+                if !download_status().is_empty() {
+                    span { class: "download-status", title: "{download_status}", "{download_status}" }
+                }
             }
         }
     }
+}
+
+async fn save_sample_excel() -> Result<Option<std::path::PathBuf>> {
+    tokio::task::spawn_blocking(|| {
+        let Some(mut path) = rfd::FileDialog::new()
+            .add_filter("Excel Workbook", &["xlsx"])
+            .set_file_name(SAMPLE_FILE_NAME)
+            .set_title("บันทึกไฟล์ Excel ตัวอย่าง")
+            .save_file()
+        else {
+            return Ok(None);
+        };
+
+        if path.extension().is_none() {
+            path.set_extension("xlsx");
+        } else if !path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("xlsx"))
+        {
+            return Err(anyhow!("ไฟล์ตัวอย่างต้องใช้นามสกุล .xlsx"));
+        }
+
+        if path.exists()
+            && rfd::MessageDialog::new()
+                .set_title("ยืนยันการแทนที่ไฟล์")
+                .set_description(format!("ไฟล์ {} มีอยู่แล้ว ต้องการแทนที่หรือไม่?", path.display()))
+                .set_buttons(rfd::MessageButtons::YesNo)
+                .show()
+                != rfd::MessageDialogResult::Yes
+        {
+            return Ok(None);
+        }
+
+        std::fs::write(&path, SAMPLE_EXCEL)
+            .with_context(|| format!("เขียนไฟล์ {} ไม่สำเร็จ", path.display()))?;
+        Ok(Some(path))
+    })
+    .await
+    .context("เปิดหน้าต่างบันทึกไฟล์ไม่สำเร็จ")?
 }
 
 #[component]
@@ -381,6 +443,28 @@ fn format_number(value: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use calamine::{Reader, Xlsx};
+    use std::io::Cursor;
+
+    #[test]
+    fn embedded_sample_has_expected_headers() -> Result<()> {
+        let mut workbook = Xlsx::new(Cursor::new(SAMPLE_EXCEL))?;
+        let sheet_names = workbook.sheet_names().to_vec();
+        assert!(!sheet_names.is_empty());
+        for sheet_name in sheet_names {
+            let range = workbook.worksheet_range(&sheet_name)?;
+            let headers = range.rows().next().context("ไฟล์ตัวอย่างไม่มีหัวตาราง")?;
+            assert_eq!(
+                headers.first().map(ToString::to_string).as_deref(),
+                Some("stdID")
+            );
+            assert_eq!(
+                headers.get(1).map(ToString::to_string).as_deref(),
+                Some("student Name")
+            );
+        }
+        Ok(())
+    }
 
     #[test]
     fn formats_whole_numbers_without_decimal() {

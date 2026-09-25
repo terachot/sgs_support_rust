@@ -30,7 +30,7 @@ button:disabled { cursor: wait; opacity: .58; }
 }
 .app-header h1 { margin: 0; font-size: 1rem; letter-spacing: .01em; }
 .app-header p { margin: 1px 0 0; color: #8fa3bf; font-size: .7rem; }
-.app-header nav { display: flex; gap: 4px; }
+.app-header nav { display: flex; align-items: center; gap: 4px; }
 .app-header a {
   padding: 5px 9px;
   border-radius: 7px;
@@ -39,6 +39,18 @@ button:disabled { cursor: wait; opacity: .58; }
   font-size: .82rem;
 }
 .app-header a:hover { background: #14223a; color: #fff; }
+.sample-download {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid #2f966b;
+  border-radius: 7px;
+  color: #e8fff2;
+  background: #166544;
+  font-size: .78rem;
+  font-weight: 700;
+}
+.sample-download:hover:not(:disabled) { background: #1b8056; }
+.download-status { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8fe3c3; font-size: .7rem; }
 
 .login-layout {
   width: min(1080px, calc(100% - 32px));
@@ -104,6 +116,8 @@ button:disabled { cursor: wait; opacity: .58; }
   background: #0a1628;
 }
 .field input:focus { border-color: #4f91ff; box-shadow: 0 0 0 3px rgba(79, 145, 255, .13); }
+.remember-option { display: flex; align-items: center; gap: 7px; margin: 7px 0 3px; color: #adbed3; font-size: .78rem; cursor: pointer; }
+.remember-option input { width: 14px; height: 14px; margin: 0; accent-color: #397ff0; }
 .login-status { min-height: 20px; margin: 4px 0 0; color: #9fb1c9; font-size: .78rem; text-align: center; }
 
 .button {
@@ -137,6 +151,7 @@ button:disabled { cursor: wait; opacity: .58; }
 .tab-button { flex: 1; min-width: max-content; padding: 7px 9px; border: 0; border-radius: 7px; color: #8fa3bf; background: transparent; font-size: .82rem; }
 .tab-button:hover { color: #fff; background: #142640; }
 .tab-button.active { color: #fff; background: #1c3b68; box-shadow: inset 0 0 0 1px #3262a0; }
+.logout-button { flex: 0 0 auto; margin-left: auto; }
 .workspace-card { margin-top: 9px; padding: 16px; border-radius: 13px; }
 .workspace-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .workspace-title h2 { margin: 3px 0 0; font-size: clamp(1.2rem, 2.5vw, 1.6rem); }
@@ -151,7 +166,7 @@ button:disabled { cursor: wait; opacity: .58; }
 .log-panel { width: min(1120px, calc(100% - 32px)); margin: 0 auto 8px; border-radius: 11px; overflow: hidden; }
 .log-panel .panel-heading { padding: 6px 10px; border-bottom: 1px solid #223451; }
 .log-panel h3 { font-size: .82rem; }
-.log-lines { height: 54px; padding: 7px 10px; overflow-y: auto; color: #8fe3c3; background: #07101d; font: .74rem/1.45 Consolas, monospace; }
+.log-lines { height: clamp(130px, 22vh, 220px); padding: 7px 10px; overflow-y: auto; color: #8fe3c3; background: #07101d; font: .74rem/1.45 Consolas, monospace; }
 .log-lines p { margin: 0 0 3px; }
 .muted { color: #657993; }
 

@@ -5,15 +5,36 @@ use dioxus_router::Navigator;
 
 use crate::browser::{Session, Target};
 use crate::compos::{push_log, AppState, Header, LogPanel};
+use crate::credentials;
 
 #[component]
 pub fn Home() -> Element {
     let app_state = use_context::<AppState>();
-    let mut username = use_signal(String::new);
-    let mut password = use_signal(String::new);
+    let saved = use_hook(|| credentials::load().map_err(|_| ()));
+    let mut username = use_signal(|| {
+        saved
+            .as_ref()
+            .ok()
+            .and_then(Option::as_ref)
+            .map_or_else(String::new, |value| value.username.clone())
+    });
+    let mut password = use_signal(|| {
+        saved
+            .as_ref()
+            .ok()
+            .and_then(Option::as_ref)
+            .map_or_else(String::new, |value| value.password.clone())
+    });
+    let mut remember = use_signal(|| matches!(&saved, Ok(Some(_))));
     let mut target = use_signal(|| Target::Production);
     let is_busy = use_signal(|| false);
-    let status = use_signal(|| "เลือกปลายทางและกรอกข้อมูลเข้าสู่ระบบ".to_owned());
+    let mut status = use_signal(|| {
+        if saved.is_err() {
+            "อ่านรหัสผ่านที่บันทึกไว้ไม่สำเร็จ".to_owned()
+        } else {
+            "เลือกปลายทางและกรอกข้อมูลเข้าสู่ระบบ".to_owned()
+        }
+    });
     let log = use_signal(|| vec!["พร้อมเริ่มการทำงาน".to_owned()]);
     let navigator = use_navigator();
 
@@ -85,6 +106,7 @@ pub fn Home() -> Element {
                                         password: password.read().clone(),
                                         password_field: password,
                                         target: target(),
+                                        remember: remember(),
                                         app_state: app_state.clone(),
                                         log,
                                         status,
@@ -97,6 +119,25 @@ pub fn Home() -> Element {
                     }
                 }
 
+                label { class: "remember-option",
+                    input {
+                        r#type: "checkbox",
+                        checked: remember(),
+                        disabled: is_busy() || target() != Target::Production,
+                        oninput: move |event| {
+                            if event.checked() {
+                                remember.set(true);
+                            } else {
+                                match credentials::delete() {
+                                    Ok(()) => remember.set(false),
+                                    Err(_) => status.set("ลบรหัสผ่านที่บันทึกไว้ไม่สำเร็จ".to_owned()),
+                                }
+                            }
+                        },
+                    }
+                    span { "จำรหัสผ่านใน Windows เครื่องนี้" }
+                }
+
                 button {
                     class: "button button-primary button-wide",
                     disabled: is_busy(),
@@ -107,6 +148,7 @@ pub fn Home() -> Element {
                             password: password.read().clone(),
                             password_field: password,
                             target: target(),
+                            remember: remember(),
                             app_state: app_state.clone(),
                             log,
                             status,
@@ -128,6 +170,7 @@ struct LoginTask {
     password: String,
     password_field: Signal<String>,
     target: Target,
+    remember: bool,
     app_state: AppState,
     log: Signal<Vec<String>>,
     status: Signal<String>,
@@ -141,6 +184,7 @@ fn start_login(task: LoginTask) {
         password,
         mut password_field,
         target,
+        remember,
         app_state,
         mut log,
         mut status,
@@ -189,6 +233,20 @@ fn start_login(task: LoginTask) {
             let _ = session.close().await;
             is_busy.set(false);
             return;
+        }
+
+        if target == Target::Production {
+            let credential_result = tokio::task::spawn_blocking(move || {
+                if remember {
+                    credentials::save(&username, &password)
+                } else {
+                    credentials::delete()
+                }
+            })
+            .await;
+            if !matches!(credential_result, Ok(Ok(()))) {
+                push_log(&mut log, "เข้าสู่ระบบสำเร็จ แต่จัดการรหัสผ่านที่บันทึกไว้ไม่สำเร็จ");
+            }
         }
 
         *session_guard = Some(session);

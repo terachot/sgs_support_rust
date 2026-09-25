@@ -1,7 +1,7 @@
 //! ควบคุม Chrome/Edge ผ่าน Chrome DevTools Protocol
 
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Context, Result};
 use chromiumoxide::browser::{Browser, BrowserConfig};
@@ -77,12 +77,22 @@ pub struct Session {
     page: Page,
     _handler: JoinHandle<()>,
     target: Target,
+    profile_dir: PathBuf,
 }
 
 impl Session {
     pub async fn launch(target: Target) -> Result<(Self, String)> {
         let chrome_path = find_system_chrome();
-        let mut builder = BrowserConfig::builder().window_size(1280, 800).with_head();
+        let profile_dir = std::env::temp_dir().join(format!(
+            "sgs-support-{}-{}",
+            std::process::id(),
+            SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
+        ));
+        let mut builder = BrowserConfig::builder()
+            .window_size(1280, 800)
+            .with_head()
+            .user_data_dir(&profile_dir)
+            .viewport(None);
 
         let source_message = if let Some(path) = chrome_path {
             builder = builder.chrome_executable(path.clone());
@@ -117,6 +127,7 @@ impl Session {
                 page,
                 _handler: handler_task,
                 target,
+                profile_dir,
             },
             source_message,
         ))
@@ -146,6 +157,7 @@ impl Session {
     }
 
     pub async fn login(&self, username: &str, password: &str) -> Result<()> {
+        self.wait_for_login_form().await?;
         let script = format!(
             r#"(function(){{
                 const username = document.querySelector('input[name="ctl00$PageContent$UserName"]')
@@ -226,6 +238,96 @@ impl Session {
         }
         Err(anyhow!(
             "เข้าสู่ระบบไม่สำเร็จหรือใช้เวลานานเกินไป (หน้าปัจจุบัน: {})",
+            self.current_url().await.unwrap_or_default()
+        ))
+    }
+
+    async fn wait_for_login_form(&self) -> Result<()> {
+        for _ in 0..40 {
+            let state: Result<String> = async {
+                Ok(self
+                    .page
+                    .evaluate(
+                        r#"(function(){
+                            const username = document.querySelector('input[name="ctl00$PageContent$UserName"]')
+                                || document.querySelector('input[type="text"]');
+                            const password = document.querySelector('input[name="ctl00$PageContent$Password"]')
+                                || document.querySelector('input[type="password"]');
+                            if (username && password) return 'form';
+                            const signIn = document.getElementById('ctl00__PageHeader__SignIn');
+                            if (/ออกจากระบบ|Sign Out|Log Out/i.test(signIn?.textContent || ''))
+                                return 'authenticated';
+                            if (document.querySelector('h1')?.textContent?.includes('Server Error in'))
+                                return 'server_error';
+                            return 'pending';
+                        })()"#,
+                    )
+                    .await?
+                    .into_value()?)
+            }
+            .await;
+
+            match state.as_deref() {
+                Ok("form") => return Ok(()),
+                Ok("authenticated") => {
+                    return Err(anyhow!("เบราว์เซอร์เข้าสู่ระบบอยู่แล้ว แต่ยังยืนยันไม่ได้ว่าเป็นบัญชีที่กรอก"));
+                }
+                Ok("server_error") => {
+                    return Err(anyhow!("หน้าเข้าสู่ระบบ SGS แสดงข้อผิดพลาดของเซิร์ฟเวอร์"));
+                }
+                _ => tokio::time::sleep(Duration::from_millis(250)).await,
+            }
+        }
+        Err(anyhow!(
+            "รอช่องเข้าสู่ระบบนานเกินไป (หน้าปัจจุบัน: {})",
+            self.current_url().await.unwrap_or_default()
+        ))
+    }
+
+    pub async fn logout(&self) -> Result<()> {
+        if self.target == Target::Mock {
+            return self.open_login().await;
+        }
+
+        let action: String = self
+            .page
+            .evaluate(
+                r#"(function(){
+                    if (document.querySelector('input[name="ctl00$PageContent$Password"]'))
+                        return 'already_signed_out';
+                    const link = document.getElementById('ctl00__PageHeader__SignIn');
+                    if (!link || !/ออกจากระบบ|Sign Out|Log Out/i.test(link.textContent || ''))
+                        return 'missing_logout';
+                    link.click();
+                    return 'clicked';
+                })()"#,
+            )
+            .await?
+            .into_value()?;
+        match action.as_str() {
+            "already_signed_out" => return Ok(()),
+            "clicked" => {}
+            _ => return Err(anyhow!("ไม่พบปุ่มออกจากระบบในหน้า SGS")),
+        }
+
+        for _ in 0..40 {
+            let signed_out: Result<bool> = async {
+                Ok(self
+                    .page
+                    .evaluate(
+                        r#"!!document.querySelector('input[name="ctl00$PageContent$Password"]')"#,
+                    )
+                    .await?
+                    .into_value()?)
+            }
+            .await;
+            if matches!(signed_out, Ok(true)) {
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+        Err(anyhow!(
+            "เว็บ SGS ไม่ยืนยันการออกจากระบบ (หน้าปัจจุบัน: {})",
             self.current_url().await.unwrap_or_default()
         ))
     }
@@ -339,6 +441,22 @@ impl Session {
 
     pub async fn close(mut self) -> Result<()> {
         self.browser.close().await.context("ปิดเบราว์เซอร์ไม่สำเร็จ")?;
+        tokio::time::timeout(Duration::from_secs(5), self.browser.wait())
+            .await
+            .context("รอ Chrome/Edge ปิดนานเกินไป")?
+            .context("รอ Chrome/Edge ปิดไม่สำเร็จ")?;
+        let temp_root = std::env::temp_dir().canonicalize()?;
+        let profile_dir = self.profile_dir.canonicalize()?;
+        let safe_name = profile_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("sgs-support-"));
+        if profile_dir.parent() != Some(temp_root.as_path()) || !safe_name {
+            return Err(anyhow!("ตำแหน่งโปรไฟล์เบราว์เซอร์ชั่วคราวไม่ถูกต้อง"));
+        }
+        tokio::fs::remove_dir_all(&profile_dir)
+            .await
+            .context("ลบโปรไฟล์เบราว์เซอร์ชั่วคราวไม่สำเร็จ")?;
         Ok(())
     }
 }
@@ -386,5 +504,35 @@ mod tests {
             "https://sgs.example/Home.aspx?session=1",
             "https://sgs.example/home.aspx"
         ));
+    }
+
+    #[tokio::test]
+    #[ignore = "ต้องใช้ Chrome/Edge และเชื่อมต่อเว็บไซต์ SGS จริง"]
+    async fn production_login_form_smoke() -> Result<()> {
+        let (session, _) = Session::launch(Target::Production).await?;
+        session.open_login().await?;
+        session.wait_for_login_form().await?;
+        assert!(session.current_url().await?.contains("SignIn.aspx"));
+        session.close().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "ต้องเปิด Chrome/Edge"]
+    async fn logout_button_smoke() -> Result<()> {
+        let (session, _) = Session::launch(Target::Production).await?;
+        session
+            .page
+            .evaluate(
+                r##"document.body.innerHTML = '<a id="ctl00__PageHeader__SignIn" href="#">ออกจากระบบ</a>';
+                   document.getElementById('ctl00__PageHeader__SignIn').onclick = event => {
+                       event.preventDefault();
+                       document.body.innerHTML = '<input name="ctl00$PageContent$Password" type="password">';
+                   };"##,
+            )
+            .await?;
+        session.logout().await?;
+        session.close().await?;
+        Ok(())
     }
 }

@@ -11,6 +11,7 @@
 
 mod browser;
 mod compos;
+mod credentials;
 mod excel;
 mod home;
 mod work;
@@ -57,7 +58,7 @@ fn main() {
                 .with_window(
                     WindowBuilder::default()
                         .with_title("SGS Support")
-                        .with_inner_size(LogicalSize::new(680, 560)),
+                        .with_inner_size(LogicalSize::new(680, 680)),
                 )
                 .with_menu(None::<dioxus::desktop::muda::Menu>)
         }))
